@@ -6,7 +6,7 @@ from streamlit_folium import st_folium
 
 from scraper import LeadScraper
 from enricher_wikidata import WikidataEnricher
-from database import init_db, insert_leads, get_project_leads
+from database import init_db, insert_leads
 
 
 # ----------------------------
@@ -19,45 +19,43 @@ init_db()
 # PAGE CONFIG
 # ----------------------------
 st.set_page_config(
-    page_title="🌸 AI Lead Intelligence Platform",
+    page_title="AI Lead Intelligence Platform",
     layout="wide"
 )
 
 
 # ----------------------------
-# 🌸 CUTE UI THEME
+# CLEAN UI THEME (LIGHT SAAS STYLE)
 # ----------------------------
 st.markdown("""
 <style>
-
-/* background */
 body {
-    background-color: #fff7fb;
+    background-color: #f7f9fc;
 }
 
-/* main title */
-h1 {
-    color: #ff4da6;
-    text-align: center;
+h1, h2, h3 {
+    color: #2d2d2d;
+}
+
+.block-container {
+    padding-top: 2rem;
 }
 
 /* buttons */
 .stButton>button {
-    background-color: #ff66b2;
+    background-color: #4f46e5;
     color: white;
-    border-radius: 12px;
-    height: 3em;
-    font-size: 16px;
+    border-radius: 10px;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
 }
 
-/* dataframe */
-div[data-testid="stDataFrame"] {
+/* metric cards */
+div[data-testid="stMetric"] {
+    background-color: white;
     border-radius: 12px;
-}
-
-/* sidebar */
-section[data-testid="stSidebar"] {
-    background-color: #ffe6f2;
+    padding: 10px;
+    box-shadow: 0px 2px 10px rgba(0,0,0,0.05);
 }
 
 </style>
@@ -67,8 +65,8 @@ section[data-testid="stSidebar"] {
 # ----------------------------
 # TITLE
 # ----------------------------
-st.title("🌸 AI Lead Intelligence Platform")
-st.write("Find, analyze, and visualize real-world business leads ✨")
+st.title("AI Lead Intelligence Platform")
+st.caption("Discover, enrich and analyze real-world business leads")
 
 
 # ----------------------------
@@ -83,38 +81,28 @@ df = load_cities()
 
 
 # ----------------------------
-# INDUSTRIES
+# SIDEBAR (CLEAN CONTROL PANEL)
 # ----------------------------
+st.sidebar.header("Search Controls")
+
 INDUSTRIES = [
     "restaurant", "cafe", "fast_food", "bakery", "hotel",
-    "supermarket", "convenience_store", "clothing_store",
     "dentist", "clinic", "hospital", "pharmacy",
     "gym", "school", "college", "university",
     "bank", "atm",
     "car_dealer", "car_repair", "gas_station"
 ]
 
-industry = st.selectbox("🌸 Select Industry", INDUSTRIES)
+industry = st.sidebar.selectbox("Industry", INDUSTRIES)
 
-
-# ----------------------------
-# 🌍 SMART CITY SEARCH (AUTOCOMPLETE STYLE)
-# ----------------------------
 city_names = df["city"] + ", " + df["country"]
 
-selected_city_name = st.selectbox(
-    "🌍 Search City (type to filter)",
+selected_city_name = st.sidebar.selectbox(
+    "City",
     options=city_names,
     index=None,
-    placeholder="Start typing city name..."
+    placeholder="Type to search..."
 )
-
-selected_city = None
-
-if selected_city_name:
-    selected_city = df[
-        (df["city"] + ", " + df["country"]) == selected_city_name
-    ].iloc[0]
 
 
 # ----------------------------
@@ -125,7 +113,7 @@ wikidata = WikidataEnricher()
 
 
 # ----------------------------
-# SCORING FUNCTION
+# SCORING
 # ----------------------------
 def score_lead(lead):
     score = 0
@@ -138,40 +126,33 @@ def score_lead(lead):
         score += 25
     if lead.get("address"):
         score += 10
-    if lead.get("name"):
-        score += 5
 
     return min(score, 100)
 
 
 def apply_scoring(leads):
-    for lead in leads:
-        lead["score"] = score_lead(lead)
+    for l in leads:
+        l["score"] = score_lead(l)
     return leads
 
 
 # ----------------------------
-# MAP FUNCTION
+# MAP
 # ----------------------------
 def create_map(leads):
-
     if not leads:
         return None
 
-    m = folium.Map(
-        location=[leads[0]["lat"], leads[0]["lon"]],
-        zoom_start=12
-    )
+    m = folium.Map(location=[leads[0]["lat"], leads[0]["lon"]], zoom_start=12)
 
-    for lead in leads:
-        if lead.get("lat") and lead.get("lon"):
+    for l in leads:
+        if l.get("lat") and l.get("lon"):
 
-            color = "red" if lead.get("score", 0) > 70 else "blue"
+            color = "green" if l.get("score", 0) > 70 else "red"
 
             folium.Marker(
-                location=[lead["lat"], lead["lon"]],
-                popup=f"{lead['name']} (Score: {lead.get('score',0)})",
-                tooltip=lead["name"],
+                location=[l["lat"], l["lon"]],
+                popup=f"{l['name']} | Score: {l.get('score',0)}",
                 icon=folium.Icon(color=color)
             ).add_to(m)
 
@@ -184,38 +165,20 @@ def create_map(leads):
 if "results" not in st.session_state:
     st.session_state.results = []
 
-if "enriching" not in st.session_state:
-    st.session_state.enriching = False
-
 
 # ----------------------------
-# BACKGROUND ENRICHMENT
+# GENERATE
 # ----------------------------
-def enrich_worker(leads, wikidata):
-
-    for lead in leads:
-        enriched = wikidata.enrich(lead)
-        lead.update(enriched)
-        lead["score"] = score_lead(lead)
-
-        st.session_state.results = leads
-
-    st.session_state.enriching = False
-
-
-# ----------------------------
-# GENERATE BUTTON
-# ----------------------------
-if st.button("🚀 Generate Leads"):
+if st.sidebar.button("Generate Leads"):
 
     if not selected_city_name:
-        st.warning("Please select a city 🌍")
+        st.warning("Select a city")
         st.stop()
 
-    lat = selected_city["lat"]
-    lon = selected_city["lng"]
+    city_row = df[(df["city"] + ", " + df["country"]) == selected_city_name].iloc[0]
 
-    st.info("Fetching beautiful leads ✨")
+    lat = city_row["lat"]
+    lon = city_row["lng"]
 
     raw = scraper.search(industry, (lat, lon))
 
@@ -229,71 +192,50 @@ if st.button("🚀 Generate Leads"):
             seen.add(key)
             results.append(r)
 
-    # scoring
     results = apply_scoring(results)
 
-    # save to DB (default project)
-    insert_leads(f"{industry.title()} Leads", results)
+    insert_leads(industry, results)
 
     st.session_state.results = results
 
-    # enrichment
-    st.session_state.enriching = True
-
-    thread = threading.Thread(
-        target=enrich_worker,
-        args=(results, wikidata),
-        daemon=True
-    )
-    thread.start()
-
 
 # ----------------------------
-# LOAD FROM DATABASE (PROJECT STYLE)
-# ----------------------------
-if selected_city_name:
-    st.session_state.results = st.session_state.results
-
-
-# ----------------------------
-# RESULTS SECTION
+# DASHBOARD METRICS
 # ----------------------------
 if st.session_state.results:
 
-    st.subheader("🏆 Leads")
+    leads = st.session_state.results
 
-    df_out = pd.DataFrame(st.session_state.results)
+    col1, col2, col3 = st.columns(3)
 
-    preferred_cols = [
-        "name", "website", "phone", "email",
-        "address", "score", "lat", "lon"
+    col1.metric("Total Leads", len(leads))
+    col2.metric("High Score", len([l for l in leads if l.get("score",0) > 70]))
+    col3.metric("Avg Score",
+                round(sum(l.get("score",0) for l in leads)/len(leads),1)
+                if leads else 0)
+
+    st.divider()
+
+    # ----------------------------
+    # TABLE
+    # ----------------------------
+    st.subheader("Lead Results")
+
+    df_out = pd.DataFrame(leads)[
+        ["name", "website", "phone", "email", "address", "score"]
     ]
-
-    df_out = df_out[[c for c in preferred_cols if c in df_out.columns]]
 
     st.dataframe(df_out, use_container_width=True)
 
     # ----------------------------
-    # DOWNLOAD
-    # ----------------------------
-    csv = df_out.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        "⬇ Download CSV",
-        csv,
-        "leads.csv",
-        "text/csv"
-    )
-
-    # ----------------------------
     # MAP
     # ----------------------------
-    st.subheader("🗺️ Map View")
+    st.subheader("Map View")
 
-    map_obj = create_map(st.session_state.results)
+    map_obj = create_map(leads)
 
     if map_obj:
         st_folium(map_obj, width=900, height=500)
 
 else:
-    st.info("🌸 Start by selecting industry + city and generate leads")
+    st.info("Generate leads to view dashboard")
