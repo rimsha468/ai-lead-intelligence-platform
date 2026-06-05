@@ -57,7 +57,7 @@ html, body, [class*="css"] {
 st.markdown("""
 <div style="margin-top:-20px;">
     <h1 style="margin-bottom:0;">🧠 LeadAtlas AI</h1>
-    <p style="color:gray; margin-top:5px;">
+    <p style="color:gray; margin-top:10px;">
         Geospatial Lead Intelligence & CRM Dashboard
     </p>
 </div>
