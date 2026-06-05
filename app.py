@@ -55,7 +55,7 @@ html, body, [class*="css"] {
 # HEADER (MOVED UP CLEANLY)
 # ----------------------------
 st.markdown("""
-<div style="margin-top:-30px;">
+<div style="margin-top:-5px;">
     <h1 style="margin-bottom:0;">🧠 LeadAtlas AI</h1>
     <p style="color:gray; margin-top:10px;">
         Geospatial Lead Intelligence & CRM Dashboard
