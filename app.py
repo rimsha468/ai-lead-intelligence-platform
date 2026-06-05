@@ -64,26 +64,6 @@ section[data-testid="stSidebar"] * {
     font-family: "Segoe UI", sans-serif;
 }
 
-st.markdown("""
-<style>
-
-/* REMOVE Streamlit default collapse button completely */
-[data-testid="collapsedControl"] {
-    display: none !important;
-}
-
-/* keep sidebar clean */
-section[data-testid="stSidebar"] {
-    background-color: #C9EBFF;
-}
-
-/* fonts */
-html, body, [class*="css"] {
-    font-family: "Segoe UI", sans-serif;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 /* Better main font */
 html, body, [class*="css"] {
@@ -93,6 +73,27 @@ html, body, [class*="css"] {
 /* Reduce top spacing globally */
 .block-container {
     padding-top: 1.5rem;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+
+/* REMOVE Streamlit default collapse button completely */
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+/* Sidebar background */
+section[data-testid="stSidebar"] {
+    background-color: #C9EBFF;
+}
+
+/* Clean fonts */
+html, body, [class*="css"] {
+    font-family: "Segoe UI", sans-serif;
 }
 
 </style>
