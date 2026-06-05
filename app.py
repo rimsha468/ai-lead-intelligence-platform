@@ -93,19 +93,6 @@ def apply_scoring(leads):
 
 
 # ----------------------------
-# SMART COMPLETENESS SCORE
-# ----------------------------
-def completeness_score(l):
-    score = 0
-    if l.get("name"): score += 2
-    if l.get("phone"): score += 2
-    if l.get("email"): score += 2
-    if l.get("address"): score += 2
-    if l.get("website"): score += 2
-    return score
-
-
-# ----------------------------
 # SESSION STATE
 # ----------------------------
 if "leads" not in st.session_state:
@@ -146,18 +133,10 @@ if st.sidebar.button("🚀 Generate Leads"):
 
     results = apply_scoring(results)
 
-    # filter score
+    # filter by slider
     results = [r for r in results if r.get("score", 0) >= score_filter]
 
     insert_leads(industry, results)
-
-    # ----------------------------
-    # SORTING (IMPORTANT FIX)
-    # ----------------------------
-    results.sort(
-        key=lambda x: (x.get("score", 0), completeness_score(x)),
-        reverse=True
-    )
 
     st.session_state.leads = results
     st.session_state.page = 1
@@ -172,7 +151,7 @@ filtered = [l for l in leads if l.get("score", 0) >= score_filter]
 
 
 # ----------------------------
-# SMART PAGINATION (ONLY 100 INITIALLY)
+# SMART PAGINATION
 # ----------------------------
 start = 0
 end = st.session_state.page * PAGE_SIZE
@@ -181,7 +160,7 @@ paged_leads = filtered[start:end]
 
 
 # ----------------------------
-# LOAD MORE BUTTON
+# LOAD MORE
 # ----------------------------
 if len(filtered) > end:
     if st.button("⬇ Load More"):
@@ -190,16 +169,20 @@ if len(filtered) > end:
 
 
 # ----------------------------
-# METRICS
+# METRICS (FIXED AS REQUESTED)
 # ----------------------------
-if paged_leads:
+if leads:
+
+    total_leads = len(leads)
+
+    high_quality = len([l for l in leads if l.get("score", 0) >= 60])
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("📦 Loaded", len(paged_leads))
-    col2.metric("🔥 High Quality", len([l for l in paged_leads if l.get("score",0)>=70]))
+    col1.metric("📦 Total Leads", total_leads)
+    col2.metric("🔥 High Quality (60+)", high_quality)
 
-    avg = round(sum(l.get("score",0) for l in paged_leads)/len(paged_leads),1)
+    avg = round(sum(l.get("score", 0) for l in leads) / len(leads), 1)
     col3.metric("📊 Avg Score", avg)
 
 
@@ -207,7 +190,7 @@ st.markdown("---")
 
 
 # ----------------------------
-# TABLE (ORDERED FIELDS FIRST)
+# TABLE
 # ----------------------------
 st.markdown("### 📋 Lead Database")
 
@@ -234,7 +217,7 @@ st.dataframe(df_out, use_container_width=True)
 
 
 # ----------------------------
-# MAP (LIMITED FOR PERFORMANCE)
+# MAP (LIMITED)
 # ----------------------------
 st.markdown("### 🗺️ Lead Map")
 
@@ -245,10 +228,10 @@ if paged_leads:
         zoom_start=12
     )
 
-    for l in paged_leads[:100]:  # SAFE LIMIT FOR MAP
+    for l in paged_leads[:100]:
         if l.get("lat") and l.get("lon"):
 
-            color = "green" if l.get("score", 0) > 70 else "red"
+            color = "green" if l.get("score", 0) >= 60 else "red"
 
             folium.Marker(
                 location=[l["lat"], l["lon"]],
