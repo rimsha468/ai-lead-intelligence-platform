@@ -19,33 +19,24 @@ st.set_page_config(
 
 
 # ----------------------------
-# GLOBAL UI STYLES
+# LIGHT SIDEBAR STYLE (FIXED)
 # ----------------------------
 st.markdown("""
 <style>
 
-/* Sidebar background */
+/* Sidebar background - LIGHT BLUE */
 section[data-testid="stSidebar"] {
-    background-color: #0f172a;
+    background-color: #C9EBFF;
 }
 
 /* Sidebar text */
 section[data-testid="stSidebar"] * {
-    color: #e5e7eb !important;
-    font-family: 'Arial';
+    color: #0f172a !important;
 }
 
-/* Main title */
-h1, h2, h3 {
+/* Main fonts clean */
+html, body, [class*="css"]  {
     font-family: 'Segoe UI', sans-serif;
-}
-
-/* Metric cards feel */
-div[data-testid="stMetric"] {
-    background-color: white;
-    padding: 10px;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 
 </style>
@@ -75,7 +66,7 @@ df = load_cities()
 
 
 # ----------------------------
-# INDUSTRY CLEANING
+# CLEAN INDUSTRY NAMES
 # ----------------------------
 def format_industry(name):
     return name.replace("_", " ").title()
@@ -93,9 +84,9 @@ industry_map = {i: format_industry(i) for i in INDUSTRIES}
 
 
 # ----------------------------
-# SIDEBAR
+# SIDEBAR (SIMPLE)
 # ----------------------------
-st.sidebar.title("Lead Intelligence Panel")
+st.sidebar.title("Lead Panel")
 
 industry = st.sidebar.selectbox(
     "Industry",
@@ -106,13 +97,13 @@ industry = st.sidebar.selectbox(
 city_names = df["city"] + ", " + df["country"]
 
 selected_city_name = st.sidebar.selectbox(
-    "City Search",
+    "City",
     options=city_names,
     index=None,
-    placeholder="Type city..."
+    placeholder="Search city..."
 )
 
-score_filter = st.sidebar.slider("Minimum Score", 0, 100, 0)
+score_filter = st.sidebar.slider("Min Score", 0, 100, 0)
 
 
 # ----------------------------
@@ -141,7 +132,7 @@ def apply_scoring(leads):
 
 
 # ----------------------------
-# COMPLETENESS SCORE (FIXED ORDERING)
+# COMPLETENESS SORT
 # ----------------------------
 def completeness_score(l):
     return sum([
@@ -160,7 +151,7 @@ if "leads" not in st.session_state:
 
 
 # ----------------------------
-# GENERATE
+# GENERATE LEADS
 # ----------------------------
 if st.sidebar.button("🚀 Generate Leads"):
 
@@ -190,13 +181,11 @@ if st.sidebar.button("🚀 Generate Leads"):
 
     insert_leads(industry, results)
 
-    # ----------------------------
-    # FIXED SORTING (YOUR REQUEST)
-    # ----------------------------
+    # SORTING (UNCHANGED LOGIC)
     results.sort(
         key=lambda x: (
-            completeness_score(x),   # 4 > 3 > 2 > 1 > 0
-            x.get("score", 0)        # then score
+            completeness_score(x),
+            x.get("score", 0)
         ),
         reverse=True
     )
@@ -214,13 +203,13 @@ filtered = [l for l in leads if l.get("score", 0) >= score_filter]
 # ----------------------------
 # METRICS
 # ----------------------------
-if filtered:
+if leads:
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("📦 Total Leads", len(leads))
-    col2.metric("🔥 High Quality (60+)", len([l for l in leads if l.get("score", 0) >= 60]))
-    col3.metric("📊 Avg Score", round(sum(l.get("score", 0) for l in leads) / len(leads), 1))
+    col1.metric("Total Leads", len(leads))
+    col2.metric("High Quality (60+)", len([l for l in leads if l.get("score", 0) >= 60]))
+    col3.metric("Avg Score", round(sum(l.get("score", 0) for l in leads) / len(leads), 1))
 
 
 st.markdown("---")
@@ -229,7 +218,7 @@ st.markdown("---")
 # ----------------------------
 # TABLE
 # ----------------------------
-st.markdown("### 📋 Lead Database")
+st.markdown("### Lead Database")
 
 df_out = pd.DataFrame(filtered)
 
@@ -247,7 +236,7 @@ st.dataframe(df_out, use_container_width=True)
 # ----------------------------
 # MAP
 # ----------------------------
-st.markdown("### 🗺️ Lead Map")
+st.markdown("### Lead Map")
 
 if filtered:
 
