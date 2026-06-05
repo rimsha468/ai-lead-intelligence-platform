@@ -14,8 +14,11 @@ from database import init_db, insert_leads
 init_db()
 
 st.set_page_config(
-    page_title="AI Lead CRM Pro",
-    layout="wide"
+    st.title("LeadAtlas AI")
+st.markdown(
+    "<p style='font-size:18px; color:gray;'>AI-powered geospatial lead intelligence & CRM system</p>",
+    unsafe_allow_html=True
+)
 )
 
 
