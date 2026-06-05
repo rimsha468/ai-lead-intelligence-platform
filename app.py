@@ -276,3 +276,16 @@ if filtered:
 
 else:
     st.info("Generate leads to view dashboard")
+
+st.markdown("""
+<style>
+[data-testid="collapsedControl"] {
+    font-size: 0 !important;
+}
+
+[data-testid="collapsedControl"]::before {
+    content: "☰";
+    font-size: 20px;
+}
+</style>
+""", unsafe_allow_html=True)
