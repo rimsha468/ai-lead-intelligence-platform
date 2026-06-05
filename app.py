@@ -19,6 +19,40 @@ st.set_page_config(
 
 
 # ----------------------------
+# GLOBAL UI STYLES
+# ----------------------------
+st.markdown("""
+<style>
+
+/* Sidebar background */
+section[data-testid="stSidebar"] {
+    background-color: #0f172a;
+}
+
+/* Sidebar text */
+section[data-testid="stSidebar"] * {
+    color: #e5e7eb !important;
+    font-family: 'Arial';
+}
+
+/* Main title */
+h1, h2, h3 {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Metric cards feel */
+div[data-testid="stMetric"] {
+    background-color: white;
+    padding: 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# ----------------------------
 # HEADER
 # ----------------------------
 st.markdown("""
@@ -30,7 +64,7 @@ st.markdown("---")
 
 
 # ----------------------------
-# LOAD CITIES
+# LOAD DATA
 # ----------------------------
 @st.cache_data
 def load_cities():
@@ -41,9 +75,11 @@ df = load_cities()
 
 
 # ----------------------------
-# SIDEBAR
+# INDUSTRY CLEANING
 # ----------------------------
-st.sidebar.title("⚙️ CRM Controls")
+def format_industry(name):
+    return name.replace("_", " ").title()
+
 
 INDUSTRIES = [
     "restaurant", "cafe", "fast_food", "bakery", "hotel",
@@ -53,7 +89,19 @@ INDUSTRIES = [
     "car_dealer", "car_repair", "gas_station"
 ]
 
-industry = st.sidebar.selectbox("Industry", INDUSTRIES)
+industry_map = {i: format_industry(i) for i in INDUSTRIES}
+
+
+# ----------------------------
+# SIDEBAR
+# ----------------------------
+st.sidebar.title("Lead Intelligence Panel")
+
+industry = st.sidebar.selectbox(
+    "Industry",
+    options=INDUSTRIES,
+    format_func=lambda x: industry_map[x]
+)
 
 city_names = df["city"] + ", " + df["country"]
 
@@ -93,20 +141,26 @@ def apply_scoring(leads):
 
 
 # ----------------------------
+# COMPLETENESS SCORE (FIXED ORDERING)
+# ----------------------------
+def completeness_score(l):
+    return sum([
+        1 if l.get("name") else 0,
+        1 if l.get("phone") else 0,
+        1 if l.get("email") else 0,
+        1 if l.get("address") else 0
+    ])
+
+
+# ----------------------------
 # SESSION STATE
 # ----------------------------
 if "leads" not in st.session_state:
     st.session_state.leads = []
 
-if "page" not in st.session_state:
-    st.session_state.page = 1
-
-
-PAGE_SIZE = 100
-
 
 # ----------------------------
-# GENERATE LEADS
+# GENERATE
 # ----------------------------
 if st.sidebar.button("🚀 Generate Leads"):
 
@@ -121,7 +175,6 @@ if st.sidebar.button("🚀 Generate Leads"):
 
     raw = scraper.search(industry, (lat, lon))
 
-    # dedupe
     seen = set()
     results = []
 
@@ -133,57 +186,41 @@ if st.sidebar.button("🚀 Generate Leads"):
 
     results = apply_scoring(results)
 
-    # filter by slider
     results = [r for r in results if r.get("score", 0) >= score_filter]
 
     insert_leads(industry, results)
 
+    # ----------------------------
+    # FIXED SORTING (YOUR REQUEST)
+    # ----------------------------
+    results.sort(
+        key=lambda x: (
+            completeness_score(x),   # 4 > 3 > 2 > 1 > 0
+            x.get("score", 0)        # then score
+        ),
+        reverse=True
+    )
+
     st.session_state.leads = results
-    st.session_state.page = 1
 
 
 # ----------------------------
 # DATA
 # ----------------------------
 leads = st.session_state.leads
-
 filtered = [l for l in leads if l.get("score", 0) >= score_filter]
 
 
 # ----------------------------
-# SMART PAGINATION
+# METRICS
 # ----------------------------
-start = 0
-end = st.session_state.page * PAGE_SIZE
-
-paged_leads = filtered[start:end]
-
-
-# ----------------------------
-# LOAD MORE
-# ----------------------------
-if len(filtered) > end:
-    if st.button("⬇ Load More"):
-        st.session_state.page += 1
-        st.rerun()
-
-
-# ----------------------------
-# METRICS (FIXED AS REQUESTED)
-# ----------------------------
-if leads:
-
-    total_leads = len(leads)
-
-    high_quality = len([l for l in leads if l.get("score", 0) >= 60])
+if filtered:
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("📦 Total Leads", total_leads)
-    col2.metric("🔥 High Quality (60+)", high_quality)
-
-    avg = round(sum(l.get("score", 0) for l in leads) / len(leads), 1)
-    col3.metric("📊 Avg Score", avg)
+    col1.metric("📦 Total Leads", len(leads))
+    col2.metric("🔥 High Quality (60+)", len([l for l in leads if l.get("score", 0) >= 60]))
+    col3.metric("📊 Avg Score", round(sum(l.get("score", 0) for l in leads) / len(leads), 1))
 
 
 st.markdown("---")
@@ -194,18 +231,9 @@ st.markdown("---")
 # ----------------------------
 st.markdown("### 📋 Lead Database")
 
-df_out = pd.DataFrame(paged_leads)
+df_out = pd.DataFrame(filtered)
 
-columns = [
-    "name",
-    "phone",
-    "email",
-    "address",
-    "website",
-    "score",
-    "lat",
-    "lon"
-]
+columns = ["name", "phone", "email", "address", "website", "score"]
 
 for c in columns:
     if c not in df_out.columns:
@@ -217,21 +245,21 @@ st.dataframe(df_out, use_container_width=True)
 
 
 # ----------------------------
-# MAP (LIMITED)
+# MAP
 # ----------------------------
 st.markdown("### 🗺️ Lead Map")
 
-if paged_leads:
+if filtered:
 
     m = folium.Map(
-        location=[paged_leads[0]["lat"], paged_leads[0]["lon"]],
+        location=[filtered[0]["lat"], filtered[0]["lon"]],
         zoom_start=12
     )
 
-    for l in paged_leads[:100]:
+    for l in filtered[:100]:
         if l.get("lat") and l.get("lon"):
 
-            color = "green" if l.get("score", 0) >= 60 else "red"
+            color = "green" if completeness_score(l) == 4 else "red"
 
             folium.Marker(
                 location=[l["lat"], l["lon"]],
