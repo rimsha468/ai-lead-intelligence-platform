@@ -19,7 +19,7 @@ st.set_page_config(
 
 
 # ----------------------------
-# CLEAN CRM STYLE HEADER
+# HEADER
 # ----------------------------
 st.markdown("""
 # 🧠 LeadAtlas AI  
@@ -41,7 +41,7 @@ df = load_cities()
 
 
 # ----------------------------
-# SIDEBAR CONTROLS
+# SIDEBAR
 # ----------------------------
 st.sidebar.title("⚙️ CRM Controls")
 
@@ -61,7 +61,7 @@ selected_city_name = st.sidebar.selectbox(
     "City Search",
     options=city_names,
     index=None,
-    placeholder="Type city name..."
+    placeholder="Type city..."
 )
 
 score_filter = st.sidebar.slider("Minimum Score", 0, 100, 0)
@@ -74,7 +74,7 @@ scraper = LeadScraper()
 
 
 # ----------------------------
-# SCORING SYSTEM
+# SCORING
 # ----------------------------
 def score_lead(l):
     score = 0
@@ -82,6 +82,7 @@ def score_lead(l):
     if l.get("phone"): score += 20
     if l.get("email"): score += 25
     if l.get("address"): score += 10
+    if l.get("name"): score += 5
     return min(score, 100)
 
 
@@ -92,19 +93,38 @@ def apply_scoring(leads):
 
 
 # ----------------------------
+# SMART COMPLETENESS SCORE
+# ----------------------------
+def completeness_score(l):
+    score = 0
+    if l.get("name"): score += 2
+    if l.get("phone"): score += 2
+    if l.get("email"): score += 2
+    if l.get("address"): score += 2
+    if l.get("website"): score += 2
+    return score
+
+
+# ----------------------------
 # SESSION STATE
 # ----------------------------
 if "leads" not in st.session_state:
     st.session_state.leads = []
 
+if "page" not in st.session_state:
+    st.session_state.page = 1
+
+
+PAGE_SIZE = 100
+
 
 # ----------------------------
-# GENERATE BUTTON
+# GENERATE LEADS
 # ----------------------------
 if st.sidebar.button("🚀 Generate Leads"):
 
     if not selected_city_name:
-        st.warning("Please select a city")
+        st.warning("Select a city first")
         st.stop()
 
     city_row = df[(df["city"] + ", " + df["country"]) == selected_city_name].iloc[0]
@@ -126,12 +146,21 @@ if st.sidebar.button("🚀 Generate Leads"):
 
     results = apply_scoring(results)
 
-    # filter
+    # filter score
     results = [r for r in results if r.get("score", 0) >= score_filter]
 
     insert_leads(industry, results)
 
+    # ----------------------------
+    # SORTING (IMPORTANT FIX)
+    # ----------------------------
+    results.sort(
+        key=lambda x: (x.get("score", 0), completeness_score(x)),
+        reverse=True
+    )
+
     st.session_state.leads = results
+    st.session_state.page = 1
 
 
 # ----------------------------
@@ -139,81 +168,84 @@ if st.sidebar.button("🚀 Generate Leads"):
 # ----------------------------
 leads = st.session_state.leads
 
-
-# ----------------------------
-# FILTERED LEADS
-# ----------------------------
 filtered = [l for l in leads if l.get("score", 0) >= score_filter]
 
 
 # ----------------------------
-# METRICS (SAAS CARDS)
+# SMART PAGINATION (ONLY 100 INITIALLY)
 # ----------------------------
-if filtered:
+start = 0
+end = st.session_state.page * PAGE_SIZE
+
+paged_leads = filtered[start:end]
+
+
+# ----------------------------
+# LOAD MORE BUTTON
+# ----------------------------
+if len(filtered) > end:
+    if st.button("⬇ Load More"):
+        st.session_state.page += 1
+        st.rerun()
+
+
+# ----------------------------
+# METRICS
+# ----------------------------
+if paged_leads:
 
     col1, col2, col3 = st.columns(3)
 
-    col1.markdown(f"""
-    <div style="background:white;padding:15px;border-radius:12px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.05);text-align:center;">
-    <h4>📦 Total Leads</h4>
-    <h2 style="color:#4f46e5">{len(filtered)}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+    col1.metric("📦 Loaded", len(paged_leads))
+    col2.metric("🔥 High Quality", len([l for l in paged_leads if l.get("score",0)>=70]))
 
-    col2.markdown(f"""
-    <div style="background:white;padding:15px;border-radius:12px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.05);text-align:center;">
-    <h4>🔥 High Quality</h4>
-    <h2 style="color:#16a34a">{len([l for l in filtered if l.get('score',0)>=70])}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-    avg = round(sum(l.get("score",0) for l in filtered)/len(filtered),1)
-
-    col3.markdown(f"""
-    <div style="background:white;padding:15px;border-radius:12px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.05);text-align:center;">
-    <h4>📊 Avg Score</h4>
-    <h2 style="color:#f59e0b">{avg}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+    avg = round(sum(l.get("score",0) for l in paged_leads)/len(paged_leads),1)
+    col3.metric("📊 Avg Score", avg)
 
 
 st.markdown("---")
 
 
 # ----------------------------
-# TABLE
+# TABLE (ORDERED FIELDS FIRST)
 # ----------------------------
 st.markdown("### 📋 Lead Database")
 
-df_out = pd.DataFrame(filtered)
+df_out = pd.DataFrame(paged_leads)
 
-cols = ["name", "website", "phone", "email", "address", "score"]
+columns = [
+    "name",
+    "phone",
+    "email",
+    "address",
+    "website",
+    "score",
+    "lat",
+    "lon"
+]
 
-for c in cols:
+for c in columns:
     if c not in df_out.columns:
         df_out[c] = None
 
-df_out = df_out[cols]
+df_out = df_out[columns]
 
 st.dataframe(df_out, use_container_width=True)
 
 
 # ----------------------------
-# MAP
+# MAP (LIMITED FOR PERFORMANCE)
 # ----------------------------
 st.markdown("### 🗺️ Lead Map")
 
-if filtered:
+if paged_leads:
 
     m = folium.Map(
-        location=[filtered[0]["lat"], filtered[0]["lon"]],
+        location=[paged_leads[0]["lat"], paged_leads[0]["lon"]],
         zoom_start=12
     )
 
-    for l in filtered[:500]:  # performance safe limit
+    for l in paged_leads[:100]:  # SAFE LIMIT FOR MAP
         if l.get("lat") and l.get("lon"):
 
             color = "green" if l.get("score", 0) > 70 else "red"
@@ -227,4 +259,4 @@ if filtered:
     st_folium(m, width=900, height=500)
 
 else:
-    st.info("Generate leads to view CRM dashboard")
+    st.info("Generate leads to view dashboard")
