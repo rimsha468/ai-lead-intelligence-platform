@@ -19,26 +19,18 @@ st.set_page_config(
 
 
 # ----------------------------
-# LIGHT SIDEBAR STYLE (FIXED)
+# SIDEBAR STYLE (LIGHT BLUE)
 # ----------------------------
 st.markdown("""
 <style>
-
-/* Sidebar background - LIGHT BLUE */
 section[data-testid="stSidebar"] {
     background-color: #C9EBFF;
 }
 
-/* Sidebar text */
 section[data-testid="stSidebar"] * {
     color: #0f172a !important;
+    font-family: "Segoe UI", sans-serif;
 }
-
-/* Main fonts clean */
-html, body, [class*="css"]  {
-    font-family: 'Segoe UI', sans-serif;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,25 +58,30 @@ df = load_cities()
 
 
 # ----------------------------
-# CLEAN INDUSTRY NAMES
+# INDUSTRIES (FULL LIST)
 # ----------------------------
+INDUSTRIES = [
+    "restaurant", "cafe", "fast_food", "bakery", "hotel",
+    "supermarket", "convenience_store", "clothing_store",
+    "leather_goods", "shoe_store", "electronics_store",
+    "furniture_store", "bookstore", "jewelry_store",
+    "dentist", "clinic", "hospital", "pharmacy", "veterinary",
+    "gym", "school", "college", "university",
+    "bank", "atm",
+    "car_dealer", "car_repair", "gas_station",
+    "church", "mosque"
+]
+
+
 def format_industry(name):
     return name.replace("_", " ").title()
 
-
-INDUSTRIES = [
-    "restaurant", "cafe", "fast_food", "bakery", "hotel",
-    "dentist", "clinic", "hospital", "pharmacy",
-    "gym", "school", "college", "university",
-    "bank", "atm",
-    "car_dealer", "car_repair", "gas_station"
-]
 
 industry_map = {i: format_industry(i) for i in INDUSTRIES}
 
 
 # ----------------------------
-# SIDEBAR (SIMPLE)
+# SIDEBAR CONTROLS
 # ----------------------------
 st.sidebar.title("Lead Panel")
 
@@ -132,7 +129,7 @@ def apply_scoring(leads):
 
 
 # ----------------------------
-# COMPLETENESS SORT
+# COMPLETENESS SCORE (IMPORTANT FOR SORTING)
 # ----------------------------
 def completeness_score(l):
     return sum([
@@ -156,7 +153,7 @@ if "leads" not in st.session_state:
 if st.sidebar.button("🚀 Generate Leads"):
 
     if not selected_city_name:
-        st.warning("Select a city first")
+        st.warning("Please select a city first")
         st.stop()
 
     city_row = df[(df["city"] + ", " + df["country"]) == selected_city_name].iloc[0]
@@ -166,6 +163,9 @@ if st.sidebar.button("🚀 Generate Leads"):
 
     raw = scraper.search(industry, (lat, lon))
 
+    # ----------------------------
+    # DEDUPLICATION
+    # ----------------------------
     seen = set()
     results = []
 
@@ -175,17 +175,23 @@ if st.sidebar.button("🚀 Generate Leads"):
             seen.add(key)
             results.append(r)
 
+    # ----------------------------
+    # SCORING
+    # ----------------------------
     results = apply_scoring(results)
 
+    # filter by score slider
     results = [r for r in results if r.get("score", 0) >= score_filter]
 
     insert_leads(industry, results)
 
-    # SORTING (UNCHANGED LOGIC)
+    # ----------------------------
+    # SORTING (CRITICAL FIX YOU WANTED)
+    # ----------------------------
     results.sort(
         key=lambda x: (
-            completeness_score(x),
-            x.get("score", 0)
+            completeness_score(x),   # 4 → 3 → 2 → 1 → 0 fields first
+            x.get("score", 0)        # then score
         ),
         reverse=True
     )
@@ -208,8 +214,18 @@ if leads:
     col1, col2, col3 = st.columns(3)
 
     col1.metric("Total Leads", len(leads))
-    col2.metric("High Quality (60+)", len([l for l in leads if l.get("score", 0) >= 60]))
-    col3.metric("Avg Score", round(sum(l.get("score", 0) for l in leads) / len(leads), 1))
+
+    col2.metric(
+        "High Quality (60+)",
+        len([l for l in leads if l.get("score", 0) >= 60])
+    )
+
+    avg_score = round(
+        sum(l.get("score", 0) for l in leads) / len(leads),
+        1
+    )
+
+    col3.metric("Avg Score", avg_score)
 
 
 st.markdown("---")
