@@ -10,7 +10,7 @@ from database import init_db, insert_leads
 
 
 # ----------------------------
-# INIT DB
+# INIT
 # ----------------------------
 init_db()
 
@@ -19,29 +19,33 @@ init_db()
 # PAGE CONFIG
 # ----------------------------
 st.set_page_config(
-    page_title="AI Lead Intelligence Platform",
+    page_title="AI Lead CRM Dashboard",
     layout="wide"
 )
 
 
 # ----------------------------
-# CLEAN UI THEME (LIGHT SAAS STYLE)
+# CLEAN CRM STYLE UI
 # ----------------------------
 st.markdown("""
 <style>
+
 body {
-    background-color: #f7f9fc;
+    background-color: #f6f7fb;
 }
 
-h1, h2, h3 {
-    color: #2d2d2d;
+/* Title */
+h1 {
+    color: #111827;
 }
 
-.block-container {
-    padding-top: 2rem;
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #ffffff;
+    border-right: 1px solid #e5e7eb;
 }
 
-/* buttons */
+/* Buttons */
 .stButton>button {
     background-color: #4f46e5;
     color: white;
@@ -50,12 +54,17 @@ h1, h2, h3 {
     font-weight: 500;
 }
 
-/* metric cards */
+/* DataFrame */
+div[data-testid="stDataFrame"] {
+    border-radius: 12px;
+}
+
+/* Metric cards */
 div[data-testid="stMetric"] {
     background-color: white;
-    border-radius: 12px;
     padding: 10px;
-    box-shadow: 0px 2px 10px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
 }
 
 </style>
@@ -65,8 +74,8 @@ div[data-testid="stMetric"] {
 # ----------------------------
 # TITLE
 # ----------------------------
-st.title("AI Lead Intelligence Platform")
-st.caption("Discover, enrich and analyze real-world business leads")
+st.title("🧠 AI Lead CRM Dashboard")
+st.caption("Discover, score, and manage business leads like a CRM system")
 
 
 # ----------------------------
@@ -81,9 +90,9 @@ df = load_cities()
 
 
 # ----------------------------
-# SIDEBAR (CLEAN CONTROL PANEL)
+# SIDEBAR (CRM CONTROLS)
 # ----------------------------
-st.sidebar.header("Search Controls")
+st.sidebar.header("CRM Controls")
 
 INDUSTRIES = [
     "restaurant", "cafe", "fast_food", "bakery", "hotel",
@@ -98,15 +107,17 @@ industry = st.sidebar.selectbox("Industry", INDUSTRIES)
 city_names = df["city"] + ", " + df["country"]
 
 selected_city_name = st.sidebar.selectbox(
-    "City",
+    "City Search",
     options=city_names,
     index=None,
-    placeholder="Type to search..."
+    placeholder="Type city name..."
 )
+
+score_filter = st.sidebar.slider("Minimum Lead Score", 0, 100, 0)
 
 
 # ----------------------------
-# INIT CLASSES
+# INIT SERVICES
 # ----------------------------
 scraper = LeadScraper()
 wikidata = WikidataEnricher()
@@ -126,6 +137,8 @@ def score_lead(lead):
         score += 25
     if lead.get("address"):
         score += 10
+    if lead.get("name"):
+        score += 5
 
     return min(score, 100)
 
@@ -148,7 +161,7 @@ def create_map(leads):
     for l in leads:
         if l.get("lat") and l.get("lon"):
 
-            color = "green" if l.get("score", 0) > 70 else "red"
+            color = "green" if l.get("score", 0) >= 70 else "red"
 
             folium.Marker(
                 location=[l["lat"], l["lon"]],
@@ -162,17 +175,17 @@ def create_map(leads):
 # ----------------------------
 # SESSION STATE
 # ----------------------------
-if "results" not in st.session_state:
-    st.session_state.results = []
+if "leads" not in st.session_state:
+    st.session_state.leads = []
 
 
 # ----------------------------
-# GENERATE
+# GENERATE LEADS
 # ----------------------------
 if st.sidebar.button("Generate Leads"):
 
     if not selected_city_name:
-        st.warning("Select a city")
+        st.warning("Please select a city")
         st.stop()
 
     city_row = df[(df["city"] + ", " + df["country"]) == selected_city_name].iloc[0]
@@ -196,46 +209,78 @@ if st.sidebar.button("Generate Leads"):
 
     insert_leads(industry, results)
 
-    st.session_state.results = results
+    st.session_state.leads = results
+
+
+# ----------------------------
+# FILTER LEADS (CRM CORE)
+# ----------------------------
+leads = st.session_state.leads
+
+filtered_leads = [
+    l for l in leads
+    if l.get("score", 0) >= score_filter
+]
 
 
 # ----------------------------
 # DASHBOARD METRICS
 # ----------------------------
-if st.session_state.results:
-
-    leads = st.session_state.results
+if filtered_leads:
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("Total Leads", len(leads))
-    col2.metric("High Score", len([l for l in leads if l.get("score",0) > 70]))
+    col1.metric("Total Leads", len(filtered_leads))
+    col2.metric("High Quality", len([l for l in filtered_leads if l.get("score",0) >= 70]))
     col3.metric("Avg Score",
-                round(sum(l.get("score",0) for l in leads)/len(leads),1)
-                if leads else 0)
+                round(sum(l.get("score",0) for l in filtered_leads)/len(filtered_leads),1))
 
     st.divider()
 
-    # ----------------------------
-    # TABLE
-    # ----------------------------
-    st.subheader("Lead Results")
 
-    df_out = pd.DataFrame(leads)[
-        ["name", "website", "phone", "email", "address", "score"]
-    ]
+    # ----------------------------
+    # CRM TABLE SAFE FIX
+    # ----------------------------
+    df_out = pd.DataFrame(filtered_leads)
 
+    columns = ["name", "website", "phone", "email", "address", "score"]
+
+    for c in columns:
+        if c not in df_out.columns:
+            df_out[c] = None
+
+    df_out = df_out[columns]
+
+
+    st.subheader("📋 Leads Database (CRM View)")
     st.dataframe(df_out, use_container_width=True)
 
-    # ----------------------------
-    # MAP
-    # ----------------------------
-    st.subheader("Map View")
 
-    map_obj = create_map(leads)
+    # ----------------------------
+    # LEAD DETAIL VIEW (CRM STYLE)
+    # ----------------------------
+    st.subheader("🔎 Lead Inspector")
+
+    selected = st.selectbox(
+        "Select a lead to view details",
+        df_out["name"].tolist()
+    )
+
+    lead = next((l for l in filtered_leads if l["name"] == selected), None)
+
+    if lead:
+        st.json(lead)
+
+
+    # ----------------------------
+    # MAP VIEW
+    # ----------------------------
+    st.subheader("🗺️ Map View")
+
+    map_obj = create_map(filtered_leads)
 
     if map_obj:
         st_folium(map_obj, width=900, height=500)
 
 else:
-    st.info("Generate leads to view dashboard")
+    st.info("No leads match the selected filter. Generate leads first.")
