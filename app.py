@@ -8,6 +8,124 @@ from scraper import LeadScraper
 from database import init_db, insert_leads
 
 
+
+import streamlit as st
+from streamlit_extras.let_it_rain import rain
+import time
+
+st.set_page_config(
+    page_title="LeadAtlas AI",
+    layout="wide"
+)
+
+# ----------------------------
+# SESSION STATE
+# ----------------------------
+if "started" not in st.session_state:
+    st.session_state.started = False
+
+
+# ----------------------------
+# START SCREEN LOGIC
+# ----------------------------
+if not st.session_state.started:
+
+    # 🌈 Gradient Background
+    st.markdown("""
+    <style>
+    .hero {
+        text-align: center;
+        padding: 80px 20px;
+        background: linear-gradient(135deg, #f8fafc, #eef2ff);
+        border-radius: 20px;
+        margin-bottom: 30px;
+    }
+
+    .logo {
+        font-size: 18px;
+        font-weight: 600;
+        color: #4f46e5;
+        letter-spacing: 2px;
+    }
+
+    .title {
+        font-size: 54px;
+        font-weight: 800;
+        margin-bottom: 10px;
+        color: #111827;
+    }
+
+    .subtitle {
+        font-size: 20px;
+        color: #6b7280;
+    }
+
+    </style>
+    """, unsafe_allow_html=True)
+
+
+    # ----------------------------
+    # BRAND BLOCK
+    # ----------------------------
+    st.markdown("""
+    <div class="hero">
+        <div class="logo">🌍 LEADATLAS AI</div>
+        <div class="title">Intelligent Lead Discovery System</div>
+        <div class="subtitle">Geospatial AI + CRM + Data Intelligence Platform</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+    # ----------------------------
+    # ANIMATED TYPING TAGLINE
+    # ----------------------------
+    tagline = [
+        "Discover real-world business leads...",
+        "Enrich data using AI intelligence...",
+        "Score and prioritize opportunities...",
+        "Manage leads like a modern CRM..."
+    ]
+
+    placeholder = st.empty()
+
+    for text in tagline:
+        placeholder.markdown(f"### ✨ {text}")
+        time.sleep(1.2)
+
+    st.markdown("---")
+
+
+    # ----------------------------
+    # FEATURE BLOCKS
+    # ----------------------------
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("### 🧠 AI Lead Scoring")
+        st.write("Automatically rank business opportunities using smart signals.")
+
+    with col2:
+        st.markdown("### 🌍 Geo Intelligence")
+        st.write("Extract and visualize real-world businesses globally.")
+
+    with col3:
+        st.markdown("### 📊 CRM Dashboard")
+        st.write("Filter, search, and manage leads like a SaaS platform.")
+
+
+    st.markdown("---")
+
+
+    # ----------------------------
+    # ENTER BUTTON
+    # ----------------------------
+    if st.button("🚀 Launch LeadAtlas AI"):
+        st.session_state.started = True
+        st.rerun()
+
+    st.stop()
+
+
 # ----------------------------
 # INIT
 # ----------------------------
@@ -44,12 +162,6 @@ div[data-testid="stMetric"] {
 </style>
 """, unsafe_allow_html=True)
 
-
-# ----------------------------
-# TITLE
-# ----------------------------
-st.title("🧠 AI Lead CRM Pro")
-st.caption("Scalable lead intelligence system with smart loading & map clustering")
 
 
 # ----------------------------
@@ -217,7 +329,7 @@ st.dataframe(df_out, use_container_width=True)
 # ----------------------------
 # MAP (CLUSTERED - NO LAG)
 # ----------------------------
-st.subheader("🗺️ Map View (Clustered)")
+st.subheader("🗺️ Map View )")
 
 if paged_leads:
 
