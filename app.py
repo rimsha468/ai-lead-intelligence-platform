@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
-import threading
 import folium
+from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
 
 from scraper import LeadScraper
-from enricher_wikidata import WikidataEnricher
 from database import init_db, insert_leads
 
 
@@ -14,59 +13,33 @@ from database import init_db, insert_leads
 # ----------------------------
 init_db()
 
-
-# ----------------------------
-# PAGE CONFIG
-# ----------------------------
 st.set_page_config(
-    page_title="AI Lead CRM Dashboard",
+    page_title="AI Lead CRM Pro",
     layout="wide"
 )
 
 
 # ----------------------------
-# CLEAN CRM STYLE UI
+# CLEAN UI
 # ----------------------------
 st.markdown("""
 <style>
+body { background-color: #f6f7fb; }
 
-body {
-    background-color: #f6f7fb;
-}
+h1 { color: #111827; }
 
-/* Title */
-h1 {
-    color: #111827;
-}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background-color: #ffffff;
-    border-right: 1px solid #e5e7eb;
-}
-
-/* Buttons */
 .stButton>button {
     background-color: #4f46e5;
     color: white;
     border-radius: 10px;
     padding: 0.5rem 1rem;
-    font-weight: 500;
 }
 
-/* DataFrame */
-div[data-testid="stDataFrame"] {
-    border-radius: 12px;
-}
-
-/* Metric cards */
 div[data-testid="stMetric"] {
     background-color: white;
     padding: 10px;
     border-radius: 12px;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -74,8 +47,8 @@ div[data-testid="stMetric"] {
 # ----------------------------
 # TITLE
 # ----------------------------
-st.title("🧠 AI Lead CRM Dashboard")
-st.caption("Discover, score, and manage business leads like a CRM system")
+st.title("🧠 AI Lead CRM Pro")
+st.caption("Scalable lead intelligence system with smart loading & map clustering")
 
 
 # ----------------------------
@@ -90,9 +63,9 @@ df = load_cities()
 
 
 # ----------------------------
-# SIDEBAR (CRM CONTROLS)
+# SIDEBAR FILTERS
 # ----------------------------
-st.sidebar.header("CRM Controls")
+st.sidebar.header("Filters")
 
 INDUSTRIES = [
     "restaurant", "cafe", "fast_food", "bakery", "hotel",
@@ -107,40 +80,31 @@ industry = st.sidebar.selectbox("Industry", INDUSTRIES)
 city_names = df["city"] + ", " + df["country"]
 
 selected_city_name = st.sidebar.selectbox(
-    "City Search",
+    "City",
     options=city_names,
     index=None,
-    placeholder="Type city name..."
+    placeholder="Search city..."
 )
 
-score_filter = st.sidebar.slider("Minimum Lead Score", 0, 100, 0)
+min_score = st.sidebar.slider("Minimum Score", 0, 100, 0)
 
 
 # ----------------------------
-# INIT SERVICES
+# SCRAPER
 # ----------------------------
 scraper = LeadScraper()
-wikidata = WikidataEnricher()
 
 
 # ----------------------------
 # SCORING
 # ----------------------------
-def score_lead(lead):
+def score_lead(l):
     score = 0
-
-    if lead.get("website"):
-        score += 25
-    if lead.get("phone"):
-        score += 20
-    if lead.get("email"):
-        score += 25
-    if lead.get("address"):
-        score += 10
-    if lead.get("name"):
-        score += 5
-
-    return min(score, 100)
+    if l.get("website"): score += 25
+    if l.get("phone"): score += 20
+    if l.get("email"): score += 25
+    if l.get("address"): score += 10
+    return score
 
 
 def apply_scoring(leads):
@@ -150,42 +114,25 @@ def apply_scoring(leads):
 
 
 # ----------------------------
-# MAP
-# ----------------------------
-def create_map(leads):
-    if not leads:
-        return None
-
-    m = folium.Map(location=[leads[0]["lat"], leads[0]["lon"]], zoom_start=12)
-
-    for l in leads:
-        if l.get("lat") and l.get("lon"):
-
-            color = "green" if l.get("score", 0) >= 70 else "red"
-
-            folium.Marker(
-                location=[l["lat"], l["lon"]],
-                popup=f"{l['name']} | Score: {l.get('score',0)}",
-                icon=folium.Icon(color=color)
-            ).add_to(m)
-
-    return m
-
-
-# ----------------------------
 # SESSION STATE
 # ----------------------------
-if "leads" not in st.session_state:
-    st.session_state.leads = []
+if "all_leads" not in st.session_state:
+    st.session_state.all_leads = []
+
+if "page" not in st.session_state:
+    st.session_state.page = 1
+
+
+PAGE_SIZE = 100
 
 
 # ----------------------------
 # GENERATE LEADS
 # ----------------------------
-if st.sidebar.button("Generate Leads"):
+if st.sidebar.button("🚀 Generate Leads"):
 
     if not selected_city_name:
-        st.warning("Please select a city")
+        st.warning("Select a city first")
         st.stop()
 
     city_row = df[(df["city"] + ", " + df["country"]) == selected_city_name].iloc[0]
@@ -207,80 +154,88 @@ if st.sidebar.button("Generate Leads"):
 
     results = apply_scoring(results)
 
+    # filter by score
+    results = [r for r in results if r.get("score", 0) >= min_score]
+
     insert_leads(industry, results)
 
-    st.session_state.leads = results
+    st.session_state.all_leads = results
+    st.session_state.page = 1
 
 
 # ----------------------------
-# FILTER LEADS (CRM CORE)
+# SMART PAGINATION (LOAD MORE SYSTEM)
 # ----------------------------
-leads = st.session_state.leads
+leads = st.session_state.all_leads
 
-filtered_leads = [
-    l for l in leads
-    if l.get("score", 0) >= score_filter
-]
+start = 0
+end = st.session_state.page * PAGE_SIZE
+
+paged_leads = leads[start:end]
 
 
 # ----------------------------
-# DASHBOARD METRICS
+# METRICS
 # ----------------------------
-if filtered_leads:
+if paged_leads:
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("Total Leads", len(filtered_leads))
-    col2.metric("High Quality", len([l for l in filtered_leads if l.get("score",0) >= 70]))
+    col1.metric("Loaded Leads", len(paged_leads))
+    col2.metric("Total Available", len(leads))
     col3.metric("Avg Score",
-                round(sum(l.get("score",0) for l in filtered_leads)/len(filtered_leads),1))
-
-    st.divider()
+                round(sum(l.get("score",0) for l in paged_leads)/len(paged_leads),1))
 
 
-    # ----------------------------
-    # CRM TABLE SAFE FIX
-    # ----------------------------
-    df_out = pd.DataFrame(filtered_leads)
-
-    columns = ["name", "website", "phone", "email", "address", "score"]
-
-    for c in columns:
-        if c not in df_out.columns:
-            df_out[c] = None
-
-    df_out = df_out[columns]
+# ----------------------------
+# LOAD MORE BUTTON
+# ----------------------------
+if len(leads) > end:
+    if st.button("⬇ Load More"):
+        st.session_state.page += 1
 
 
-    st.subheader("📋 Leads Database (CRM View)")
-    st.dataframe(df_out, use_container_width=True)
+# ----------------------------
+# TABLE VIEW
+# ----------------------------
+st.subheader("📋 Leads")
+
+df_out = pd.DataFrame(paged_leads)
+
+columns = ["name", "website", "phone", "email", "address", "score"]
+
+for c in columns:
+    if c not in df_out.columns:
+        df_out[c] = None
+
+df_out = df_out[columns]
+
+st.dataframe(df_out, use_container_width=True)
 
 
-    # ----------------------------
-    # LEAD DETAIL VIEW (CRM STYLE)
-    # ----------------------------
-    st.subheader("🔎 Lead Inspector")
+# ----------------------------
+# MAP (CLUSTERED - NO LAG)
+# ----------------------------
+st.subheader("🗺️ Map View (Clustered)")
 
-    selected = st.selectbox(
-        "Select a lead to view details",
-        df_out["name"].tolist()
-    )
+if paged_leads:
 
-    lead = next((l for l in filtered_leads if l["name"] == selected), None)
+    m = folium.Map(location=[paged_leads[0]["lat"], paged_leads[0]["lon"]], zoom_start=12)
 
-    if lead:
-        st.json(lead)
+    cluster = MarkerCluster().add_to(m)
 
+    for l in paged_leads[:500]:  # safety limit for browser
+        if l.get("lat") and l.get("lon"):
 
-    # ----------------------------
-    # MAP VIEW
-    # ----------------------------
-    st.subheader("🗺️ Map View")
+            color = "green" if l.get("score",0) > 70 else "red"
 
-    map_obj = create_map(filtered_leads)
+            folium.Marker(
+                location=[l["lat"], l["lon"]],
+                popup=f"{l['name']} | Score: {l.get('score',0)}",
+                icon=folium.Icon(color=color)
+            ).add_to(cluster)
 
-    if map_obj:
-        st_folium(map_obj, width=900, height=500)
+    st_folium(m, width=900, height=500)
 
 else:
-    st.info("No leads match the selected filter. Generate leads first.")
+    st.info("Generate leads to see map")
