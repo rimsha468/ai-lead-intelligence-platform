@@ -8,32 +8,21 @@ from database import init_db, insert_leads
 
 
 # ----------------------------
-# INIT
+# PAGE CONFIG (MUST BE FIRST)
 # ----------------------------
-init_db()
-
 st.set_page_config(
     page_title="LeadAtlas AI",
     layout="wide"
 )
 
-st.markdown("""
-<style>
-[data-testid="collapsedControl"] {
-    font-size: 0 !important;
-}
 
-[data-testid="collapsedControl"]::before {
-    content: "☰";
-    font-size: 20px;
-}
-</style>
-""", unsafe_allow_html=True)
 # ----------------------------
-# SIDEBAR STYLE (LIGHT BLUE)
+# CLEAN UI STYLES (FIXED SIDEBAR + HEADER)
 # ----------------------------
 st.markdown("""
 <style>
+
+/* Sidebar light theme */
 section[data-testid="stSidebar"] {
     background-color: #C9EBFF;
 }
@@ -42,19 +31,45 @@ section[data-testid="stSidebar"] * {
     color: #0f172a !important;
     font-family: "Segoe UI", sans-serif;
 }
+
+/* Hide broken Streamlit collapse icon */
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+/* Better main font */
+html, body, [class*="css"] {
+    font-family: "Segoe UI", sans-serif;
+}
+
+/* Reduce top spacing globally */
+.block-container {
+    padding-top: 1.5rem;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 
 # ----------------------------
-# HEADER
+# HEADER (MOVED UP CLEANLY)
 # ----------------------------
 st.markdown("""
-# 🧠 LeadAtlas AI  
-### <span style='color:gray'>Geospatial Lead Intelligence & CRM Dashboard</span>
+<div style="margin-top:-20px;">
+    <h1 style="margin-bottom:0;">🧠 LeadAtlas AI</h1>
+    <p style="color:gray; margin-top:5px;">
+        Geospatial Lead Intelligence & CRM Dashboard
+    </p>
+</div>
 """, unsafe_allow_html=True)
 
 st.markdown("---")
+
+
+# ----------------------------
+# INIT
+# ----------------------------
+init_db()
 
 
 # ----------------------------
@@ -92,29 +107,6 @@ industry_map = {i: format_industry(i) for i in INDUSTRIES}
 
 
 # ----------------------------
-# SIDEBAR CONTROLS
-# ----------------------------
-st.sidebar.title("Lead Panel")
-
-industry = st.sidebar.selectbox(
-    "Industry",
-    options=INDUSTRIES,
-    format_func=lambda x: industry_map[x]
-)
-
-city_names = df["city"] + ", " + df["country"]
-
-selected_city_name = st.sidebar.selectbox(
-    "City",
-    options=city_names,
-    index=None,
-    placeholder="Search city..."
-)
-
-score_filter = st.sidebar.slider("Min Score", 0, 100, 0)
-
-
-# ----------------------------
 # SCRAPER
 # ----------------------------
 scraper = LeadScraper()
@@ -140,7 +132,7 @@ def apply_scoring(leads):
 
 
 # ----------------------------
-# COMPLETENESS SCORE (IMPORTANT FOR SORTING)
+# COMPLETENESS (IMPORTANT SORTING LOGIC)
 # ----------------------------
 def completeness_score(l):
     return sum([
@@ -156,6 +148,29 @@ def completeness_score(l):
 # ----------------------------
 if "leads" not in st.session_state:
     st.session_state.leads = []
+
+
+# ----------------------------
+# SIDEBAR (SIMPLE + CLEAN)
+# ----------------------------
+st.sidebar.title("Lead Panel")
+
+industry = st.sidebar.selectbox(
+    "Industry",
+    options=INDUSTRIES,
+    format_func=lambda x: industry_map[x]
+)
+
+city_names = df["city"] + ", " + df["country"]
+
+selected_city_name = st.sidebar.selectbox(
+    "City",
+    options=city_names,
+    index=None,
+    placeholder="Search city..."
+)
+
+score_filter = st.sidebar.slider("Min Score", 0, 100, 0)
 
 
 # ----------------------------
@@ -191,18 +206,17 @@ if st.sidebar.button("🚀 Generate Leads"):
     # ----------------------------
     results = apply_scoring(results)
 
-    # filter by score slider
     results = [r for r in results if r.get("score", 0) >= score_filter]
 
     insert_leads(industry, results)
 
     # ----------------------------
-    # SORTING (CRITICAL FIX YOU WANTED)
+    # SORTING (YOUR REQUEST FIXED)
     # ----------------------------
     results.sort(
         key=lambda x: (
-            completeness_score(x),   # 4 → 3 → 2 → 1 → 0 fields first
-            x.get("score", 0)        # then score
+            completeness_score(x),  # 4 → 3 → 2 → 1 → 0 fields first
+            x.get("score", 0)
         ),
         reverse=True
     )
@@ -231,12 +245,8 @@ if leads:
         len([l for l in leads if l.get("score", 0) >= 60])
     )
 
-    avg_score = round(
-        sum(l.get("score", 0) for l in leads) / len(leads),
-        1
-    )
-
-    col3.metric("Avg Score", avg_score)
+    avg = round(sum(l.get("score", 0) for l in leads) / len(leads), 1)
+    col3.metric("Avg Score", avg)
 
 
 st.markdown("---")
