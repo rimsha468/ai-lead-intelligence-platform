@@ -1,129 +1,10 @@
 import streamlit as st
 import pandas as pd
 import folium
-from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
 
 from scraper import LeadScraper
 from database import init_db, insert_leads
-
-
-
-import streamlit as st
-from streamlit_extras.let_it_rain import rain
-import time
-
-st.set_page_config(
-    page_title="LeadAtlas AI",
-    layout="wide"
-)
-
-# ----------------------------
-# SESSION STATE
-# ----------------------------
-if "started" not in st.session_state:
-    st.session_state.started = False
-
-
-# ----------------------------
-# START SCREEN LOGIC
-# ----------------------------
-if not st.session_state.started:
-
-    # 🌈 Gradient Background
-    st.markdown("""
-    <style>
-    .hero {
-        text-align: center;
-        padding: 80px 20px;
-        background: linear-gradient(135deg, #f8fafc, #eef2ff);
-        border-radius: 20px;
-        margin-bottom: 30px;
-    }
-
-    .logo {
-        font-size: 18px;
-        font-weight: 600;
-        color: #4f46e5;
-        letter-spacing: 2px;
-    }
-
-    .title {
-        font-size: 54px;
-        font-weight: 800;
-        margin-bottom: 10px;
-        color: #111827;
-    }
-
-    .subtitle {
-        font-size: 20px;
-        color: #6b7280;
-    }
-
-    </style>
-    """, unsafe_allow_html=True)
-
-
-    # ----------------------------
-    # BRAND BLOCK
-    # ----------------------------
-    st.markdown("""
-    <div class="hero">
-        <div class="logo">🌍 LEADATLAS AI</div>
-        <div class="title">Intelligent Lead Discovery System</div>
-        <div class="subtitle">Geospatial AI + CRM + Data Intelligence Platform</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-    # ----------------------------
-    # ANIMATED TYPING TAGLINE
-    # ----------------------------
-    tagline = [
-        "Discover real-world business leads...",
-        "Enrich data using AI intelligence...",
-        "Score and prioritize opportunities...",
-        "Manage leads like a modern CRM..."
-    ]
-
-    placeholder = st.empty()
-
-    for text in tagline:
-        placeholder.markdown(f"### ✨ {text}")
-        time.sleep(1.2)
-
-    st.markdown("---")
-
-
-    # ----------------------------
-    # FEATURE BLOCKS
-    # ----------------------------
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown("### 🧠 AI Lead Scoring")
-        st.write("Automatically rank business opportunities using smart signals.")
-
-    with col2:
-        st.markdown("### 🌍 Geo Intelligence")
-        st.write("Extract and visualize real-world businesses globally.")
-
-    with col3:
-        st.markdown("### 📊 CRM Dashboard")
-        st.write("Filter, search, and manage leads like a SaaS platform.")
-
-
-    st.markdown("---")
-
-
-    # ----------------------------
-    # ENTER BUTTON
-    # ----------------------------
-    if st.button("🚀 Launch LeadAtlas AI"):
-        st.session_state.started = True
-        st.rerun()
-
-    st.stop()
 
 
 # ----------------------------
@@ -131,41 +12,25 @@ if not st.session_state.started:
 # ----------------------------
 init_db()
 
-st.title("LeadAtlas AI")
-st.markdown(
-    "<p style='font-size:18px; color:gray;'>AI-powered geospatial lead intelligence & CRM system</p>",
-    unsafe_allow_html=True
+st.set_page_config(
+    page_title="LeadAtlas AI",
+    layout="wide"
 )
 
 
 # ----------------------------
-# CLEAN UI
+# CLEAN CRM STYLE HEADER
 # ----------------------------
 st.markdown("""
-<style>
-body { background-color: #f6f7fb; }
-
-h1 { color: #111827; }
-
-.stButton>button {
-    background-color: #4f46e5;
-    color: white;
-    border-radius: 10px;
-    padding: 0.5rem 1rem;
-}
-
-div[data-testid="stMetric"] {
-    background-color: white;
-    padding: 10px;
-    border-radius: 12px;
-}
-</style>
+# 🧠 LeadAtlas AI  
+### <span style='color:gray'>Geospatial Lead Intelligence & CRM Dashboard</span>
 """, unsafe_allow_html=True)
 
+st.markdown("---")
 
 
 # ----------------------------
-# LOAD DATA
+# LOAD CITIES
 # ----------------------------
 @st.cache_data
 def load_cities():
@@ -176,9 +41,9 @@ df = load_cities()
 
 
 # ----------------------------
-# SIDEBAR FILTERS
+# SIDEBAR CONTROLS
 # ----------------------------
-st.sidebar.header("Filters")
+st.sidebar.title("⚙️ CRM Controls")
 
 INDUSTRIES = [
     "restaurant", "cafe", "fast_food", "bakery", "hotel",
@@ -193,13 +58,13 @@ industry = st.sidebar.selectbox("Industry", INDUSTRIES)
 city_names = df["city"] + ", " + df["country"]
 
 selected_city_name = st.sidebar.selectbox(
-    "City",
+    "City Search",
     options=city_names,
     index=None,
-    placeholder="Search city..."
+    placeholder="Type city name..."
 )
 
-min_score = st.sidebar.slider("Minimum Score", 0, 100, 0)
+score_filter = st.sidebar.slider("Minimum Score", 0, 100, 0)
 
 
 # ----------------------------
@@ -209,7 +74,7 @@ scraper = LeadScraper()
 
 
 # ----------------------------
-# SCORING
+# SCORING SYSTEM
 # ----------------------------
 def score_lead(l):
     score = 0
@@ -217,7 +82,7 @@ def score_lead(l):
     if l.get("phone"): score += 20
     if l.get("email"): score += 25
     if l.get("address"): score += 10
-    return score
+    return min(score, 100)
 
 
 def apply_scoring(leads):
@@ -229,23 +94,17 @@ def apply_scoring(leads):
 # ----------------------------
 # SESSION STATE
 # ----------------------------
-if "all_leads" not in st.session_state:
-    st.session_state.all_leads = []
-
-if "page" not in st.session_state:
-    st.session_state.page = 1
-
-
-PAGE_SIZE = 100
+if "leads" not in st.session_state:
+    st.session_state.leads = []
 
 
 # ----------------------------
-# GENERATE LEADS
+# GENERATE BUTTON
 # ----------------------------
 if st.sidebar.button("🚀 Generate Leads"):
 
     if not selected_city_name:
-        st.warning("Select a city first")
+        st.warning("Please select a city")
         st.stop()
 
     city_row = df[(df["city"] + ", " + df["country"]) == selected_city_name].iloc[0]
@@ -267,88 +126,105 @@ if st.sidebar.button("🚀 Generate Leads"):
 
     results = apply_scoring(results)
 
-    # filter by score
-    results = [r for r in results if r.get("score", 0) >= min_score]
+    # filter
+    results = [r for r in results if r.get("score", 0) >= score_filter]
 
     insert_leads(industry, results)
 
-    st.session_state.all_leads = results
-    st.session_state.page = 1
+    st.session_state.leads = results
 
 
 # ----------------------------
-# SMART PAGINATION (LOAD MORE SYSTEM)
+# DATA
 # ----------------------------
-leads = st.session_state.all_leads
-
-start = 0
-end = st.session_state.page * PAGE_SIZE
-
-paged_leads = leads[start:end]
+leads = st.session_state.leads
 
 
 # ----------------------------
-# METRICS
+# FILTERED LEADS
 # ----------------------------
-if paged_leads:
+filtered = [l for l in leads if l.get("score", 0) >= score_filter]
+
+
+# ----------------------------
+# METRICS (SAAS CARDS)
+# ----------------------------
+if filtered:
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("Loaded Leads", len(paged_leads))
-    col2.metric("Total Available", len(leads))
-    col3.metric("Avg Score",
-                round(sum(l.get("score",0) for l in paged_leads)/len(paged_leads),1))
+    col1.markdown(f"""
+    <div style="background:white;padding:15px;border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.05);text-align:center;">
+    <h4>📦 Total Leads</h4>
+    <h2 style="color:#4f46e5">{len(filtered)}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col2.markdown(f"""
+    <div style="background:white;padding:15px;border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.05);text-align:center;">
+    <h4>🔥 High Quality</h4>
+    <h2 style="color:#16a34a">{len([l for l in filtered if l.get('score',0)>=70])}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    avg = round(sum(l.get("score",0) for l in filtered)/len(filtered),1)
+
+    col3.markdown(f"""
+    <div style="background:white;padding:15px;border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.05);text-align:center;">
+    <h4>📊 Avg Score</h4>
+    <h2 style="color:#f59e0b">{avg}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+st.markdown("---")
 
 
 # ----------------------------
-# LOAD MORE BUTTON
+# TABLE
 # ----------------------------
-if len(leads) > end:
-    if st.button("⬇ Load More"):
-        st.session_state.page += 1
+st.markdown("### 📋 Lead Database")
 
+df_out = pd.DataFrame(filtered)
 
-# ----------------------------
-# TABLE VIEW
-# ----------------------------
-st.subheader("📋 Leads")
+cols = ["name", "website", "phone", "email", "address", "score"]
 
-df_out = pd.DataFrame(paged_leads)
-
-columns = ["name", "website", "phone", "email", "address", "score"]
-
-for c in columns:
+for c in cols:
     if c not in df_out.columns:
         df_out[c] = None
 
-df_out = df_out[columns]
+df_out = df_out[cols]
 
 st.dataframe(df_out, use_container_width=True)
 
 
 # ----------------------------
-# MAP (CLUSTERED - NO LAG)
+# MAP
 # ----------------------------
-st.subheader("🗺️ Map View )")
+st.markdown("### 🗺️ Lead Map")
 
-if paged_leads:
+if filtered:
 
-    m = folium.Map(location=[paged_leads[0]["lat"], paged_leads[0]["lon"]], zoom_start=12)
+    m = folium.Map(
+        location=[filtered[0]["lat"], filtered[0]["lon"]],
+        zoom_start=12
+    )
 
-    cluster = MarkerCluster().add_to(m)
-
-    for l in paged_leads[:500]:  # safety limit for browser
+    for l in filtered[:500]:  # performance safe limit
         if l.get("lat") and l.get("lon"):
 
-            color = "green" if l.get("score",0) > 70 else "red"
+            color = "green" if l.get("score", 0) > 70 else "red"
 
             folium.Marker(
                 location=[l["lat"], l["lon"]],
                 popup=f"{l['name']} | Score: {l.get('score',0)}",
                 icon=folium.Icon(color=color)
-            ).add_to(cluster)
+            ).add_to(m)
 
     st_folium(m, width=900, height=500)
 
 else:
-    st.info("Generate leads to see map")
+    st.info("Generate leads to view CRM dashboard")
