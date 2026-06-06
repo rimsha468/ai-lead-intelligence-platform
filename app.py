@@ -17,39 +17,6 @@ st.set_page_config(
 # ----------------------------
 # CLEAN UI STYLES (FIXED SIDEBAR + HEADER)
 # ----------------------------
-st.markdown("""
-<script>
-setTimeout(() => {
-    const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-
-    if (!sidebar) return;
-
-    const btn = window.parent.document.createElement("button");
-
-    btn.innerHTML = "☰";
-    btn.style.position = "fixed";
-    btn.style.top = "12px";
-    btn.style.left = "12px";
-    btn.style.zIndex = "9999";
-    btn.style.padding = "6px 10px";
-    btn.style.borderRadius = "8px";
-    btn.style.border = "1px solid #ccc";
-    btn.style.background = "white";
-    btn.style.cursor = "pointer";
-
-    btn.onclick = () => {
-        if (sidebar.style.display === "none") {
-            sidebar.style.display = "block";
-        } else {
-            sidebar.style.display = "none";
-        }
-    };
-
-    document.body.appendChild(btn);
-}, 500);
-</script>
-""", unsafe_allow_html=True)
-
 
 st.markdown("""
 <style>
