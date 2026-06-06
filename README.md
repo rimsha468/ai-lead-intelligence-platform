@@ -2,7 +2,7 @@
 
 LeadAtlas AI is an AI-powered lead generation and intelligence system that extracts real-world business data from geographic sources, enriches it, scores it, and transforms it into actionable business insights.
 
-It simulates core functionalities of modern SaaS platforms like Apollo, HubSpot, and ZoomInfo — built from scratch for learning and portfolio demonstration.
+It simulates core functionalities of modern SaaS platforms like Apollo, HubSpot, and ZoomInfo, built from scratch for learning and portfolio demonstration.
 
 ---
 
