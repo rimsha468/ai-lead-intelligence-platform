@@ -1,4 +1,5 @@
-# 🧠 LeadAtlas AI — Geospatial Lead Intelligence Platform
+# 🧠 LeadAtlas AI 
+Geospatial Lead Intelligence Platform
 
 LeadAtlas AI is an AI-powered lead generation and intelligence system that extracts real-world business data from geographic sources, enriches it, scores it, and transforms it into actionable business insights.
 
